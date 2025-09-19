@@ -1,6 +1,6 @@
 # Prototype — Vision-Track (Counseling AI)
 
-> **Prototype for the Vision-Track app** — a hackathon–ready, full‑stack counselling AI application with a React frontend, Django REST backend, and local LLM integration (Ollama).
+> **Prototype for the Vision-Track app** — a hackathon–ready, full‑stack counselling AI application with a React frontend, Django REST backend, and Groq API integration for LLM functionality.
 
 ---
 
@@ -18,7 +18,7 @@
   * [Frontend setup (React)](#frontend-setup-react)
   * [Start everything](#start-everything)
 * [Environment variables / `.env` examples](#environment-variables--env-examples)
-* [Ollama (LLM) — install & configuration](#ollama-llm---install--configuration)
+* [Groq API — setup & configuration](#groq-api---setup--configuration)
 * [API endpoints & usage examples](#api-endpoints--usage-examples)
 * [Development tips & debugging](#development-tips--debugging)
 * [Docker (optional)](#docker-optional)
@@ -33,9 +33,9 @@
 
 This repository contains a prototype of **Vision-Track / Counseling AI** — an application that provides an interactive AI-powered career-counseling experience. It consists of:
 
-* A **Django** backend that exposes REST endpoints and orchestrates the LLM calls.
+* A **Django** backend that exposes REST endpoints and orchestrates the LLM calls via Groq API.
 * A **React** frontend that handles the user flow (questionnaire, chat UI, loading screens).
-* Integration with **Ollama**, a local LLM server used to run the language model (e.g., `llama3.1`).
+* Integration with **Groq API**, a fast and free cloud-based LLM service (models like `llama-3.1-8b-instant`, `mixtral-8x7b-32768`).
 
 This README is written for a hackathon: fast to run, easy to demo, and easy to extend.
 
@@ -45,7 +45,7 @@ This README is written for a hackathon: fast to run, easy to demo, and easy to e
 
 Add screenshots or short GIFs to the `frontend/public` folder and reference them here. Typical demo flow:
 
-1. Start Ollama (local LLM) and ensure model `llama3.1` (or another compatible model) is pulled.
+1. Set up Groq API key and ensure it's configured in your environment.
 2. Start Django backend and React frontend.
 3. Visit `http://localhost:3000` and walk through the questionnaire and chat.
 
@@ -55,9 +55,9 @@ Add screenshots or short GIFs to the `frontend/public` folder and reference them
 
 * Frontend: React, Tailwind CSS (config included), plain JS components
 * Backend: Django, Django REST Framework
-* LLM: Ollama (local service, default port `11434`) with `llama3.1` or compatible model
+* LLM: Groq API (cloud-based, fast inference) with `llama-3.1-8b-instant` or other available models
 * Data: SQLite (default for prototype)
-* Other: `langchain`, `langchain-ollama`, `django-cors-headers`
+* Other: `groq`, `langchain`, `django-cors-headers`, `python-dotenv`
 
 ---
 
@@ -66,7 +66,7 @@ Add screenshots or short GIFs to the `frontend/public` folder and reference them
 * Git
 * Python 3.10+
 * Node.js 16+ and npm
-* [Ollama](https://ollama.com/) installed and accessible locally (see section below)
+* [Groq API account](https://console.groq.com/) and API key (free tier available)
 * (Optional) Docker & Docker Compose if you prefer containerized runs
 
 ---
@@ -78,17 +78,19 @@ counseling-ai-app/
 ├── backend/
 │   ├── api/                # django app: models, views, serializers
 │   ├── counseling_ai/      # django project settings
-│   ├── venv/               # example venv (don't commit your venv)
+│   ├── venv/               
 │   ├── db.sqlite3
 │   ├── manage.py
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── .env               # environment variables (create this)
 ├── frontend/
 │   ├── public/
 │   ├── src/
 │   │   ├── components/
 │   │   └── services/
 │   ├── package.json
-│   └── tailwind.config.js
+│   ├── tailwind.config.js
+│   └── .env               
 └── README.md
 ```
 
@@ -98,7 +100,7 @@ counseling-ai-app/
 
 ## Quick start (recommended)
 
-Follow these steps in order. Use separate terminals for frontend, backend and Ollama.
+Follow these steps in order. Use separate terminals for frontend and backend.
 
 ### 1) Clone repository
 
@@ -121,7 +123,7 @@ pip install --upgrade pip
 # if a requirements.txt exists:
 pip install -r requirements.txt
 # otherwise install the main deps:
-pip install django djangorestframework django-cors-headers python-decouple langchain langchain-ollama
+pip install django djangorestframework django-cors-headers python-decouple python-dotenv groq langchain
 ```
 
 #### Windows (PowerShell)
@@ -171,15 +173,15 @@ The dev server will usually open `http://localhost:3000` in your browser. If not
 
 > Keep this terminal running.
 
-### 4) Start Ollama (local LLM)
+### 4) Set up Groq API
 
-Follow the dedicated [Ollama section](#ollama-llm---install--configuration) below. The important part: ensure Ollama is running and `llama3.1` (or another compatible model) is pulled.
+Follow the dedicated [Groq API section](#groq-api---setup--configuration) below to get your API key and configure it.
 
 ---
 
 ## Environment variables / `.env` examples
 
-Below are recommended `.env` variables for both backend and frontend. Place them in `backend/.env` and `frontend/.env` or follow your preferred local config strategy.
+Below are recommended `.env` variables for both backend and frontend. Place them in `backend/.env` and `frontend/.env`.
 
 ### Backend (`backend/.env`)
 
@@ -189,9 +191,8 @@ DJANGO_SECRET_KEY=replace_this_with_a_secure_key
 DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
 
-# Ollama
-OLLAMA_HOST=127.0.0.1:11434   # default; change if you serve Ollama elsewhere
-OLLAMA_MODEL=llama3.1         # model name used by your code
+# Groq API
+GROQ_API_KEY=your_actual_groq_api_key_here
 
 # Database (prototype uses sqlite by default so this is optional)
 # DATABASE_URL=sqlite:///db.sqlite3
@@ -204,39 +205,57 @@ OLLAMA_MODEL=llama3.1         # model name used by your code
 REACT_APP_API_URL=http://127.0.0.1:8000/api
 ```
 
-> Reminder: Never commit secrets into the repo. Use a `.gitignore` to exclude `.env` files.
+> **Important**: Never commit secrets into the repo. Use a `.gitignore` to exclude `.env` files.
 
 ---
 
-## Ollama (LLM) — install & configuration
+## Groq API — setup & configuration
 
-This project expects a locally running Ollama server to power the chat/counseling LLM.
+This project uses Groq API for fast, cloud-based LLM inference with generous free tier limits.
 
-1. Download & install Ollama: [https://ollama.com/download](https://ollama.com/download) (follow OS instructions).
-2. Pull the model you want, for example `llama3.1` (or another supported model):
+### 1. Get your Groq API key
 
-```bash
-ollama pull llama3.1
+1. Visit [console.groq.com](https://console.groq.com/)
+2. Sign up for a free account (no credit card required)
+3. Navigate to API Keys section
+4. Generate a new API key
+
+### 2. Configure your environment
+
+Add your API key to `backend/.env`:
+
+```
+GROQ_API_KEY=your_actual_groq_api_key_here
 ```
 
-3. Start the Ollama server (default binding is `127.0.0.1:11434`):
+### 3. Available models
+
+The application uses these Groq models:
+- **`llama-3.1-8b-instant`** — Fast and efficient (default)
+- **`mixtral-8x7b-32768`** — Good for longer contexts
+- **`llama3-70b-8192`** — More capable but slower
+- **`gemma2-9b-it`** — Google's Gemma model
+
+### 4. Free tier limits
+
+Groq offers generous free tier:
+- **14,400 requests per day**
+- **115,000 tokens per minute**
+- Very fast inference speeds
+
+### 5. Quick test
+
+Test your API key with curl:
 
 ```bash
-ollama serve
+curl "https://api.groq.com/openai/v1/chat/completions" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "model": "llama-3.1-8b-instant"
+  }'
 ```
-
-* Default HTTP API host: `http://127.0.0.1:11434`.
-* If you need to change host/port, set `OLLAMA_HOST` environment variable before `ollama serve` (e.g. `OLLAMA_HOST=0.0.0.0:11435 ollama serve`).
-
-Quick test (curl):
-
-```bash
-curl http://127.0.0.1:11434/v1/list
-# or test OpenAI-compatible endpoint
-curl http://127.0.0.1:11434/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"llama3.1","messages":[{"role":"user","content":"hi"}]}'
-```
-
-If your backend code uses `langchain-ollama`, it will connect to the running Ollama endpoint — ensure the host/port match your backend config.
 
 ---
 
@@ -246,9 +265,10 @@ The backend exposes REST endpoints to communicate with the LLM and manage conver
 
 * `GET /api/` — health / info
 * `POST /api/chat/` — send a user message and receive a response
-* `GET /api/models/` — (optional) list available models
+* `POST /api/submit_questionnaire/` — submit initial questionnaire data
+* `POST /api/generate_roadmap/` — generate career roadmap
 
-### Example `curl` to backend (replace with actual endpoint paths from the code)
+### Example `curl` to backend
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/chat/ \
@@ -256,24 +276,33 @@ curl -X POST http://127.0.0.1:8000/api/chat/ \
   -d '{"message":"I want career advice for becoming a software developer","context":{}}'
 ```
 
-### Example: calling Ollama directly (for debugging)
+### Example: calling Groq API directly (for debugging)
 
 ```bash
-curl http://127.0.0.1:11434/v1/chat/completions \
+curl "https://api.groq.com/openai/v1/chat/completions" \
+  -H "Authorization: Bearer YOUR_GROQ_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"llama3.1","messages":[{"role":"system","content":"You are a helpful career counselor."},{"role":"user","content":"How should I prepare for internships?"}]}'
+  -d '{
+    "messages": [
+      {"role": "system", "content": "You are a helpful career counselor."},
+      {"role": "user", "content": "How should I prepare for internships?"}
+    ],
+    "model": "llama-3.1-8b-instant"
+  }'
 ```
-
-> Tip: Inspect `backend/api/llm_engine.py` (or similar) to confirm the backend’s expected request/response format.
 
 ---
 
 ## Development tips & debugging
 
 * If the frontend shows CORS errors, ensure `django-cors-headers` is configured and `CORS_ALLOWED_ORIGINS` includes `http://localhost:3000`.
-* If the backend cannot reach Ollama, confirm `ollama serve` is running and that `OLLAMA_HOST`/URL match the backend settings.
-* Use `python manage.py runserver 0.0.0.0:8000` if you want the backend accessible externally (remember to adjust Django’s `ALLOWED_HOSTS`).
+* If you get Groq API errors, check:
+  - API key is correctly set in `.env`
+  - You haven't exceeded rate limits
+  - Model name is correct and not deprecated
+* Use `python manage.py runserver 0.0.0.0:8000` if you want the backend accessible externally (remember to adjust Django's `ALLOWED_HOSTS`).
 * For fast iteration: enable Django debug and use React hot reload.
+* Check current available models at: https://console.groq.com/docs/models
 
 ---
 
@@ -300,19 +329,9 @@ services:
     env_file: ./frontend/.env
     volumes:
       - ./frontend:/app
-  ollama:
-    image: ollama/ollama
-    ports:
-      - '11434:11434'
-    volumes:
-      - ollama_data:/root/.ollama
-volumes:
-  ollama_data:
 ```
 
-Notes:
-
-* Official Ollama images and licensing may apply. Confirm current Ollama Docker image usage and authentication before deploying.
+Note: Since Groq is a cloud API, no additional container for LLM hosting is needed.
 
 ---
 
@@ -331,16 +350,19 @@ python manage.py test
 ## Deployment notes
 
 * Production Django: use a real DB (Postgres), set `DEBUG=False`, secure `SECRET_KEY`, serve behind Gunicorn + Nginx.
-* Ollama: if you need remote hosting, run Ollama on a secured server and set `OLLAMA_HOST` accordingly. Remember the default Ollama port is `11434`.
-* Environment and secrets: use a secrets manager or environment variables (don’t commit `.env`).
+* Groq API: ensure your API key is securely stored (use environment variables or secrets manager).
+* Environment and secrets: use a secrets manager or environment variables (don't commit `.env`).
+* Rate limits: Monitor your Groq usage in production and implement appropriate rate limiting.
 
 ---
 
 ## Troubleshooting
 
-* `Connection refused` to Ollama: check `ollama serve` is running and `OLLAMA_HOST` matches.
+* `BadRequestError` from Groq: check if the model name is correct and not deprecated.
+* `Authentication error`: verify your `GROQ_API_KEY` is correct and properly loaded from `.env`.
 * CORS errors: add the frontend origin to `CORS_ALLOWED_ORIGINS` in Django settings.
 * `ModuleNotFoundError`: check Python venv is active and dependencies installed.
+* Rate limit errors: check your usage at https://console.groq.com/
 
 ---
 
